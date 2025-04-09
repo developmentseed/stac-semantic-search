@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stac-natural-query"
+version = "0.1.0"
+description = "Vector search for STAC collections using natural language"
+requires-python = ">=3.12"
+dependencies = [
+    "sentence-transformers",
+    "numpy",
+    "chromadb",
+    "fastapi",
+    "uvicorn",
+    "pystac-client",
+    "pydantic",
+    "openai",
+    "pydantic-ai",
+]
+
+[tool.setuptools]
+packages = ["stac_search"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+] 
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu" },
+]
+torchvision = [
+    { index = "pytorch-cpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

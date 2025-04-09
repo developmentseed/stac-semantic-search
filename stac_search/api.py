@@ -1,0 +1,44 @@
+"""
+FastAPI server for STAC Natural Query
+"""
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+import uvicorn
+
+from stac_search.agents.collections_search import collection_search
+from stac_search.agents.items_search import item_search, Context as ItemSearchContext
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="STAC Natural Query API",
+    description="API for semantic search of STAC collections",
+    version="0.1.0",
+)
+
+
+# Define request model
+class QueryRequest(BaseModel):
+    query: str
+    limit: int = 5
+
+
+# Define search endpoint
+@app.post("/search")
+async def search(request: QueryRequest):
+    """Search for STAC collections using natural language"""
+    results = collection_search(request.query, top_k=request.limit)
+    return {"results": results}
+
+
+@app.post("/items/search")
+async def search_items(request: QueryRequest):
+    """Search for STAC items using natural language"""
+    ctx = ItemSearchContext(query=request.query, top_k=request.limit)
+    results = await item_search(ctx)
+    return {"results": results}
+
+
+def start_server(host: str = "0.0.0.0", port: int = 8000):
+    """Start the FastAPI server"""
+    uvicorn.run(app, host=host, port=port)

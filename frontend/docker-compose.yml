@@ -1,0 +1,21 @@
+services:
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "18501:8501"
+    environment:
+      - API_URL=https://stac-semantic-search.labs.sunu.in
+    volumes:
+      - ./streamlit_app.py:/app/streamlit_app.py
+    networks:
+      - caddy
+      - default
+    labels:
+      caddy: app.stac-semantic-search.labs.sunu.in
+      caddy.reverse_proxy: "{{upstreams 8501}}"
+
+networks:
+  caddy:
+    external: true
