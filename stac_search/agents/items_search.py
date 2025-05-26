@@ -17,6 +17,7 @@ class Context:
     query: str
     location: str | None = None
     top_k: int = 5
+    return_search_params_only: bool = False
 
 
 @dataclass
@@ -216,7 +217,8 @@ def get_polygon_from_geodini(location: str):
 
 @dataclass
 class ItemSearchResult:
-    items: List[Dict[str, Any]]
+    items: List[Dict[str, Any]] | None = None
+    search_params: Dict[str, Any] | None = None
     aoi: Dict[str, Any] | None = None
     explanation: str = ""
 
@@ -271,9 +273,12 @@ async def item_search(ctx: Context) -> ItemSearchResult:
 
     # print(f"Searching with params: {params}")
 
-    items = list(client.search(**params).items_as_dicts())
+    if ctx.return_search_params_only:
+        print("Returning STAC query parameters only")
+        return ItemSearchResult(search_params=params, aoi=polygon, explanation=explanation)
 
-    return ItemSearchResult(items=items, aoi=polygon, explanation=explanation)
+    items = list(client.search(**params).items_as_dicts())
+    return ItemSearchResult(items=items, aoi=polygon, explanation=explanation, search_params=params)
 
 
 async def main():

@@ -20,21 +20,27 @@ app = FastAPI(
 # Define request model
 class QueryRequest(BaseModel):
     query: str
-    limit: int = 5
+
+
+class STACItemsRequest(BaseModel):
+    query: str
+    return_search_params_only: bool = False
 
 
 # Define search endpoint
 @app.post("/search")
 async def search(request: QueryRequest):
     """Search for STAC collections using natural language"""
-    results = collection_search(request.query, top_k=request.limit)
+    results = collection_search(request.query)
     return {"results": results}
 
 
 @app.post("/items/search")
-async def search_items(request: QueryRequest):
+async def search_items(request: STACItemsRequest):
     """Search for STAC items using natural language"""
-    ctx = ItemSearchContext(query=request.query, top_k=request.limit)
+    ctx = ItemSearchContext(
+        query=request.query, return_search_params_only=request.return_search_params_only
+    )
     results = await item_search(ctx)
     return {"results": results}
 
