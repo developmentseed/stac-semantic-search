@@ -5,11 +5,14 @@ from pystac_client import Client
 import requests
 from pydantic_ai import Agent, RunContext
 from pprint import pprint
+import os
 
 from stac_search.agents.collections_search import (
     collection_search,
     CollectionWithExplanation,
 )
+
+GEODINI_API = os.getenv("GEODINI_API")
 
 
 @dataclass
@@ -197,7 +200,7 @@ async def construct_cql2_filter(ctx: RunContext[Context]) -> Cql2Filter:
 
 
 def get_polygon_from_geodini(location: str):
-    geodini_api = "https://api.geodini.labs.sunu.in/search"
+    geodini_api = f"{GEODINI_API}/search"
     response = requests.get(
         geodini_api,
         params={
@@ -275,10 +278,14 @@ async def item_search(ctx: Context) -> ItemSearchResult:
 
     if ctx.return_search_params_only:
         print("Returning STAC query parameters only")
-        return ItemSearchResult(search_params=params, aoi=polygon, explanation=explanation)
+        return ItemSearchResult(
+            search_params=params, aoi=polygon, explanation=explanation
+        )
 
     items = list(client.search(**params).items_as_dicts())
-    return ItemSearchResult(items=items, aoi=polygon, explanation=explanation, search_params=params)
+    return ItemSearchResult(
+        items=items, aoi=polygon, explanation=explanation, search_params=params
+    )
 
 
 async def main():

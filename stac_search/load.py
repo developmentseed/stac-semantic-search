@@ -5,15 +5,21 @@ Load CLI for STAC Natural Query - creates and populates the vector database
 from sentence_transformers import SentenceTransformer
 import chromadb
 from pystac_client import Client
+import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Constants
 MODEL_NAME = "all-MiniLM-L6-v2"
-DATA_PATH = "data/chromadb"
+DATA_PATH = os.environ.get("DATA_PATH", "data/chromadb")
 
 
 def load_data(catalog_url, catalog_name):
     """Load STAC collections into the vector database"""
-    print("Initializing vector database...")
+    logger.info("Initializing vector database...")
 
     # Initialize the model
     model = SentenceTransformer(MODEL_NAME)
@@ -27,14 +33,14 @@ def load_data(catalog_url, catalog_name):
     # Initialize STAC client
     stac_client = Client.open(catalog_url)
 
-    print("Fetching STAC collections...")
+    logger.info("Fetching STAC collections...")
     collections = fetch_collections(stac_client)
-    print(f"Found {len(collections)} collections")
+    logger.info(f"Found {len(collections)} collections")
 
-    print("Generating embeddings and storing in vector database...")
+    logger.info("Generating embeddings and storing in vector database...")
     store_in_vector_db(collections, model, chroma_collection)
 
-    print("Data loading complete!")
+    logger.info("Data loading complete!")
 
 
 def fetch_collections(stac_client):
@@ -73,8 +79,15 @@ def store_in_vector_db(collections, model, chroma_collection):
 
 
 if __name__ == "__main__":
-    load_data(catalog_url="https://stac.eoapi.dev/", catalog_name="eoapi.dev")
-    load_data(
-        catalog_url="https://planetarycomputer.microsoft.com/api/stac/v1",
-        catalog_name="planetarycomputer",
+    # load_data(catalog_url="https://stac.eoapi.dev/", catalog_name="eoapi.dev")
+    # load_data(
+    #     catalog_url="https://planetarycomputer.microsoft.com/api/stac/v1",
+    #     catalog_name="planetarycomputer",
+    # )
+    import os
+
+    STAC_CATALOG_URL = os.environ.get(
+        "STAC_CATALOG_URL", "https://planetarycomputer.microsoft.com/api/stac/v1"
     )
+    STAC_CATALOG_NAME = os.environ.get("STAC_CATALOG_NAME", "planetarycomputer")
+    load_data(catalog_url=STAC_CATALOG_URL, catalog_name=STAC_CATALOG_NAME)

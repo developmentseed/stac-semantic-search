@@ -14,14 +14,13 @@ from pydantic_ai import Agent
 
 # Constants
 MODEL_NAME = "all-MiniLM-L6-v2"
-DATA_PATH = "data/chromadb"
+DATA_PATH = os.environ.get("DATA_PATH", "data/chromadb")
 OPENAI_MODEL = "gpt-4o-mini"
 
-# STAC_CATALOG_NAME = "eoapi.dev"
-# STAC_COLLECTIONS_URL = "https://stac.eoapi.dev/"
-
-STAC_CATALOG_NAME = "planetarycomputer"
-STAC_COLLECTIONS_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
+STAC_CATALOG_NAME = os.getenv("STAC_CATALOG_NAME", "planetarycomputer")
+STAC_COLLECTIONS_URL = os.getenv(
+    "STAC_COLLECTIONS_URL", "https://planetarycomputer.microsoft.com/api/stac/v1"
+)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", None)
 
