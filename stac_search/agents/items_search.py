@@ -211,9 +211,9 @@ def get_polygon_from_geodini(location: str):
             "rank": True,
         },
     )
-    results = response.json().get("results", [])
-    if results:
-        polygon = results[0].get("geometry")
+    result = response.json().get("most_probable", None)
+    if result:
+        polygon = result.get("geometry")
         return polygon
     return None
 
