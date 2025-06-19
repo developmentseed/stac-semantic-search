@@ -11,8 +11,6 @@ COPY stac_search/ ./stac_search/
 
 RUN uv sync --frozen
 
-COPY data/chromadb ./data/chromadb
-
 # Expose the port the app runs on
 EXPOSE 8000
 
