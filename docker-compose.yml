@@ -15,7 +15,7 @@ services:
     labels:
       caddy: stac-semantic-search.labs.sunu.in
       caddy.reverse_proxy: "{{upstreams 8000}}"
-    command: uv run uvicorn stac_search.api:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn stac_search.api:app --host 0.0.0.0 --port 8000 --reload
 
 networks:
   caddy:
