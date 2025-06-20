@@ -33,7 +33,7 @@ jobs:
 
       - name: Package Helm chart
         run: |
-          helm package helm/stac-semantic-search --destination ./chart-packages
+          helm package helm-chart --destination ./chart-packages
 
       - name: Push Helm chart to GHCR
         run: |
