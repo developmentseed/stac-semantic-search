@@ -4,15 +4,19 @@ from typing import List, Dict, Any
 from pystac_client import Client
 import requests
 from pydantic_ai import Agent, RunContext
-from pprint import pprint
+from pprint import pformat
 import os
+import logging
 
 from stac_search.agents.collections_search import (
     collection_search,
     CollectionWithExplanation,
 )
 
-GEODINI_API = os.getenv("GEODINI_API")
+
+GEODINI_API = os.getenv("GEODINI_API", "https://geodini.k8s.labs.ds.io")
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -87,9 +91,9 @@ class CollectionSearchResult:
 
 
 async def search_collections(query: str) -> CollectionSearchResult | None:
-    # print("Searching for relevant collections ...")
+    logger.info("Searching for relevant collections ...")
     collection_query = await collection_query_framing_agent.run(query)
-    print("Framed collection query: ", collection_query.data.query)
+    logger.info(f"Framed collection query: {collection_query.data.query}")
     if collection_query.data.is_specific:
         collections = await collection_search(collection_query.data.query)
         return CollectionSearchResult(collections=collections)
@@ -231,11 +235,11 @@ async def item_search(ctx: Context) -> ItemSearchResult:
     results = await search_items_agent.run(
         f"Find items for the query: {ctx.query}", deps=ctx
     )
-    print(results.data)
+    logger.info(results.data)
 
     # determine the collections to search
     target_collections = await search_collections(ctx.query) or []
-    print("Target collections: ", target_collections)
+    logger.info(f"Target collections: {pformat(target_collections)}")
     default_target_collections = [
         "landsat-8-c2-l2",
         "sentinel-2-l2a",
@@ -267,17 +271,15 @@ async def item_search(ctx: Context) -> ItemSearchResult:
         "filter": results.data.filter,
     }
 
-    print(f"Searching with params: {params}")
+    logger.info(f"Searching with params: {params}")
 
     polygon = get_polygon_from_geodini(results.data.location)
     if polygon:
-        print(f"Found polygon for {results.data.location}")
+        logger.info(f"Found polygon for {results.data.location}")
         params["intersects"] = polygon
 
-    # print(f"Searching with params: {params}")
-
     if ctx.return_search_params_only:
-        print("Returning STAC query parameters only")
+        logger.info("Returning STAC query parameters only")
         return ItemSearchResult(
             search_params=params, aoi=polygon, explanation=explanation
         )
@@ -291,7 +293,7 @@ async def item_search(ctx: Context) -> ItemSearchResult:
 async def main():
     ctx = Context(query="NAIP imagery from Washington state")
     results = await item_search(ctx)
-    pprint(results)
+    logger.info(pformat(results))
 
 
 if __name__ == "__main__":

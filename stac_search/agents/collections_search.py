@@ -7,10 +7,14 @@ from dataclasses import dataclass
 from sentence_transformers import SentenceTransformer
 import chromadb
 from typing import List, Dict, Any
-from pprint import pprint
+from pprint import pformat
 import time
+import logging
 
 from pydantic_ai import Agent
+
+
+logger = logging.getLogger(__name__)
 
 # Constants
 MODEL_NAME = "all-MiniLM-L6-v2"
@@ -84,10 +88,10 @@ async def collection_search(
     # Initialize model and database connections
     model = SentenceTransformer(model_name)
     load_model_time = time.time()
-    print(f"Model loading time: {load_model_time - start_time:.4f} seconds")
+    logger.info(f"Model loading time: {load_model_time - start_time:.4f} seconds")
 
     client = chromadb.PersistentClient(path=data_path)
-    print(client.list_collections())
+    logger.info(client.list_collections())
     collection_name = f"{stac_catalog_name}_collections"
     collection = client.get_collection(name=collection_name)
 
@@ -122,7 +126,7 @@ Collections to evaluate:
 
 async def main():
     collections = await collection_search("Sentinel-2 imagery over France")
-    pprint(collections)
+    logger.info(pformat(collections))
 
 
 if __name__ == "__main__":
