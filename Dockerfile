@@ -5,9 +5,11 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 
-COPY stac_search/ ./stac_search/
+RUN mkdir -p stac_search
 
 RUN pip install --no-cache-dir .
+
+COPY stac_search/ ./stac_search/
 
 # Expose the port the app runs on
 EXPOSE 8000
