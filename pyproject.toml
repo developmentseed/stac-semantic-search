@@ -17,6 +17,7 @@ dependencies = [
     "pydantic",
     "openai",
     "pydantic-ai",
+    "shapely",
 ]
 
 [tool.setuptools]

@@ -8,7 +8,8 @@ from typing import List, Dict, Any, Union
 import requests
 from pydantic_ai import Agent, RunContext
 from pystac_client import Client
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from shapely.geometry import shape, mapping
 
 from stac_search.agents.collections_search import (
     collection_search,
@@ -182,8 +183,7 @@ class FilterExpr(BaseModel):
     op: str
     args: List[FilterArg]
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="ignore")
 
 
 FilterExpr.update_forward_refs()
@@ -225,6 +225,13 @@ Here's a list of properties that you can filter on:
 "eo:cloud_cover" - Cloud cover percentage on a scale of 0 to 100. Cloudless imagery means cloud cover less than 10.
 
 Return None if the query doesn't require a CQL2 filter or if you can't determine the filter or if the property is not supported.
+
+Some examples of CQL2 filters:
+- "cloudless imagery" -> {"op": "lte", "args": [{"property": "eo:cloud_cover"}, 10]}
+- "imagery from 2023 to 2024 over France with less than 10 percent cloud cover" -> {"op": "and", "args": [{"op": "lte", "args": [{"property": "eo:cloud_cover"}, 10]}]}
+- "imagery over Brazil with cloud cover between 10 and 20" -> {"op": "and", "args": [{"op": "gte", "args": [{"property": "eo:cloud_cover"}, 10]}, {"op": "lte", "args": [{"property": "eo:cloud_cover"}, 20]}]}
+
+Return the filter dictionary itself as a JSON object. No additional keys or values; just the filter dictionary.
 """,
 )
 
@@ -235,20 +242,17 @@ async def construct_cql2_filter(ctx: RunContext[Context]) -> FilterExpr | None:
 
 
 def get_polygon_from_geodini(location: str):
-    geodini_api = f"{GEODINI_API}/search"
+    geodini_api = f"{GEODINI_API}/search_complex"
     response = requests.get(
         geodini_api,
-        params={
-            "query": location,
-            "limit": 10,
-            "include_geometry": True,
-            "smart_parse": True,
-            "rank": True,
-        },
+        params={"query": location},
     )
-    result = response.json().get("most_probable", None)
+    result = response.json().get("result", None)
     if result:
         polygon = result.get("geometry")
+        logger.info(
+            f"Found polygon for {location}: {pformat(mapping(shape(polygon).simplify(tolerance=0.1)))}"
+        )
         return polygon
     return None
 
@@ -307,6 +311,13 @@ async def item_search(ctx: Context) -> ItemSearchResult:
     if polygon:
         logger.info(f"Found polygon for {results.data.location}")
         params["intersects"] = polygon
+    else:
+        return ItemSearchResult(
+            items=None,
+            search_params=params,
+            aoi=None,
+            explanation=f"No polygon found for {results.data.location}",
+        )
 
     if ctx.return_search_params_only:
         logger.info("Returning STAC query parameters only")
