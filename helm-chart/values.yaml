@@ -1,0 +1,193 @@
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# API service configuration
+api:
+  image:
+    repository: ghcr.io/sunu/stac-semantic-search/api
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  
+  replicaCount: 1
+  
+  # Init container configuration for loading STAC data
+  initContainer:
+    enabled: true
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+  
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  
+  # Environment variables for the API
+  env:
+    PYTHONUNBUFFERED: "1"
+    HF_HOME: "/app/data/.cache/huggingface"
+    GEODINI_API: "https://geodini.k8s.labs.ds.io"
+    STAC_CATALOG_NAME: "planetarycomputer"
+    STAC_CATALOG_URL: "https://planetarycomputer.microsoft.com/api/stac/v1"
+  
+  # Sensitive environment variables stored as Kubernetes secrets
+  secrets:
+    OPENAI_API_KEY: ""
+    # Add other sensitive environment variables as needed
+  
+  # Additional configuration for the API
+  config: {}
+    # Add API-specific configuration here that will be added to ConfigMap
+  
+  # Liveness and readiness probes
+  livenessProbe:
+    httpGet:
+      path: /docs
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /docs
+      port: 8000
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Frontend service configuration
+frontend:
+  image:
+    repository: ghcr.io/sunu/stac-semantic-search/frontend
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  
+  replicaCount: 1
+  
+  service:
+    type: ClusterIP
+    port: 8501
+    targetPort: 8501
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  
+  # Environment variables for the frontend
+  env: {}
+    # API_URL will be set automatically to point to the API service
+  
+  # Additional configuration for the frontend
+  config: {}
+    # Add frontend-specific configuration here that will be added to ConfigMap
+  
+  # Liveness and readiness probes
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 8501
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 8501
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    # Add other ingress annotations as needed
+  hosts:
+    - host: stac-search.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+  tls: []
+  #  - secretName: stac-search-tls
+  #    hosts:
+  #      - stac-search.local
+  
+  # API subdomain configuration
+  api:
+    enabled: true
+    hosts:
+      - host: api.stac-search.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+    #  - secretName: stac-search-api-tls
+    #    hosts:
+    #      - api.stac-search.local
+
+# Service account
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# Pod Security Context
+podSecurityContext:
+  fsGroup: 2000
+
+# Security Context
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Autoscaling (optional)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80

@@ -140,3 +140,4 @@ notes.md
 notes/
 
 stac_search/test.py
+helm-chart/examples

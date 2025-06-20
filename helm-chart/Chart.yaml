@@ -1,0 +1,18 @@
+apiVersion: v2
+name: stac-search
+description: A Helm chart for STAC Semantic Search application
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - stac
+  - search
+  - semantic
+  - geospatial
+  - satellite
+home: https://github.com/your-org/stac-semantic-search
+sources:
+  - https://github.com/your-org/stac-semantic-search
+maintainers:
+  - name: Your Name
+    email: your-email@example.com

@@ -1,0 +1,42 @@
+---
+# API ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stac-search.fullname" . }}-api-config
+  labels:
+    {{- include "stac-search.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+data:
+
+  # API configuration
+  DATA_PATH: "/app/data/chromadb"
+  # FastAPI configuration
+  FASTAPI_HOST: "0.0.0.0"
+  FASTAPI_PORT: "8000"
+  
+  # Add any additional API-specific configuration here
+  {{- range $key, $value := .Values.api.config }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+
+---
+# Frontend ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stac-search.fullname" . }}-frontend-config
+  labels:
+    {{- include "stac-search.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+data:
+  # Streamlit configuration
+  STREAMLIT_SERVER_ADDRESS: "0.0.0.0"
+  STREAMLIT_SERVER_PORT: "8501"
+  STREAMLIT_SERVER_HEADLESS: "true"
+  STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+  
+  # Add any additional frontend-specific configuration here
+  {{- range $key, $value := .Values.frontend.config }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
