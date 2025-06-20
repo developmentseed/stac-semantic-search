@@ -1,22 +1,40 @@
 services:
+  init-data:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+      - ./data/chromadb:/data/chromadb
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATA_PATH=/data/chromadb
+    command: python -m stac_search.load
+    env_file:
+      - .env
   app:
     build: .
     ports:
       - "8000:8000"
     volumes:
       - .:/app
+      - ./data/chromadb:/data/chromadb
     environment:
       - PYTHONUNBUFFERED=1
+      - DATA_PATH=/data/chromadb
     env_file:
       - .env
-    networks:
-      - caddy
-      - default
-    labels:
-      caddy: stac-semantic-search.labs.sunu.in
-      caddy.reverse_proxy: "{{upstreams 8000}}"
     command: uvicorn stac_search.api:app --host 0.0.0.0 --port 8000 --reload
-
-networks:
-  caddy:
-    external: true
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
+  streamlit:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    ports:
+      - "18501:8501"
+    environment:
+      - API_URL=http://app:8000
+    volumes:
+      - ./frontend/streamlit_app.py:/app/streamlit_app.py

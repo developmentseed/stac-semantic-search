@@ -1,12 +1,13 @@
 import datetime
+import logging
+import os
 from dataclasses import dataclass
+from pprint import pformat
 from typing import List, Dict, Any
-from pystac_client import Client
+
 import requests
 from pydantic_ai import Agent, RunContext
-from pprint import pformat
-import os
-import logging
+from pystac_client import Client
 
 from stac_search.agents.collections_search import (
     collection_search,

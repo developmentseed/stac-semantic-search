@@ -2,16 +2,16 @@
 Search module for STAC Natural Query
 """
 
-import os
-from dataclasses import dataclass
-from sentence_transformers import SentenceTransformer
-import chromadb
-from typing import List, Dict, Any
-from pprint import pformat
-import time
 import logging
+import os
+import time
+from dataclasses import dataclass
+from pprint import pformat
+from typing import List, Dict, Any
 
+import chromadb
 from pydantic_ai import Agent
+from sentence_transformers import SentenceTransformer
 
 
 logger = logging.getLogger(__name__)

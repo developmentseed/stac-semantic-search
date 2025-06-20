@@ -2,12 +2,12 @@
 Load CLI for STAC Natural Query - creates and populates the vector database
 """
 
-from sentence_transformers import SentenceTransformer
+import logging
+import os
+
 import chromadb
 from pystac_client import Client
-import os
-import logging
-
+from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
