@@ -15,13 +15,20 @@ STAC Semantic Search allows users to find satellite imagery and geospatial data 
 - **Visual Results**: Interactive maps showing search results and areas of interest
 
 
+## 🚧 Early Prototype
+
+This project is still in its very early stages and under active development. You might encounter some quirks or rough edges, but please give it a try and let us know what you think!
+
+
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Python 3.12+
-- OpenAI API key
-- Docker (optional)
+- OpenAI API key / Anthropic API key / Mistral API key (or any other LLM [supported by Pydantic AI](https://ai.pydantic.dev/models/))
+- Docker and docker compose
+- A STAC catalog to search through
+- A [Geodini instance](https://github.com/sunu/geodini) to resolve geolocation queries
+
 
 ### Installation
 
@@ -55,7 +62,7 @@ STAC Semantic Search allows users to find satellite imagery and geospatial data 
 ```bash
 curl -X POST "http://localhost:8000/search" \
      -H "Content-Type: application/json" \
-     -d '{"query": "Sentinel-2 imagery over France"}'
+     -d '{"query": "Sentinel-2 imagery"}'
 ```
 
 **Search Items**

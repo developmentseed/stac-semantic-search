@@ -19,14 +19,12 @@ logger = logging.getLogger(__name__)
 # Constants
 MODEL_NAME = "all-MiniLM-L6-v2"
 DATA_PATH = os.environ.get("DATA_PATH", "data/chromadb")
-OPENAI_MODEL = "gpt-4o-mini"
 
 STAC_CATALOG_NAME = os.getenv("STAC_CATALOG_NAME", "planetarycomputer")
 STAC_COLLECTIONS_URL = os.getenv(
     "STAC_COLLECTIONS_URL", "https://planetarycomputer.microsoft.com/api/stac/v1"
 )
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", None)
+SMALL_MODEL_NAME = os.getenv("SMALL_MODEL_NAME", "openai:gpt-4.1-mini")
 
 
 @dataclass
@@ -49,7 +47,7 @@ class RankedCollections:
 
 
 rerank_agent = Agent(
-    "openai:gpt-4o-mini",
+    SMALL_MODEL_NAME,
     result_type=RankedCollections,
     deps_type=RerankContext,
     system_prompt="""

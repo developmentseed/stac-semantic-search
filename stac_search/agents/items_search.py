@@ -3,11 +3,12 @@ import logging
 import os
 from dataclasses import dataclass
 from pprint import pformat
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 
 import requests
 from pydantic_ai import Agent, RunContext
 from pystac_client import Client
+from pydantic import BaseModel
 
 from stac_search.agents.collections_search import (
     collection_search,
@@ -16,6 +17,10 @@ from stac_search.agents.collections_search import (
 
 
 GEODINI_API = os.getenv("GEODINI_API", "https://geodini.k8s.labs.ds.io")
+SMALL_MODEL_NAME = os.getenv("SMALL_MODEL_NAME", "openai:gpt-4.1-mini")
+STAC_CATALOG_URL = os.getenv(
+    "STAC_CATALOG_URL", "https://planetarycomputer.microsoft.com/api/stac/v1"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +43,7 @@ class ItemSearchParams:
 
 
 search_items_agent = Agent(
-    "openai:gpt-4o-mini",
+    SMALL_MODEL_NAME,
     result_type=ItemSearchParams,
     deps_type=Context,
     system_prompt=f"""
@@ -60,7 +65,7 @@ class CollectionQuery:
 
 
 collection_query_framing_agent = Agent(
-    "openai:gpt-4o-mini",
+    SMALL_MODEL_NAME,
     result_type=CollectionQuery,
     system_prompt="""
 The user query is searching for relevant satellite imagery. 
@@ -108,7 +113,7 @@ class GeocodingResult:
 
 
 geocoding_agent = Agent(
-    "openai:gpt-4o-mini",
+    SMALL_MODEL_NAME,
     result_type=GeocodingResult,
     system_prompt="""
 For the given query, if it contains a location, return location query to be used to search for the location.
@@ -134,7 +139,7 @@ class TemporalRangeResult:
 
 
 temporal_range_agent = Agent(
-    "openai:gpt-4o-mini",
+    SMALL_MODEL_NAME,
     result_type=TemporalRangeResult,
     system_prompt="""
 For the given query, if it contains a temporal range, return the start date and end date. If it doesn't contain a temporal range, return None.
@@ -151,17 +156,42 @@ async def set_temporal_range(ctx: RunContext[Context]) -> TemporalRangeResult:
     return result.data
 
 
-@dataclass
-class Cql2Filter:
-    """Parameters to be used to query the STAC API"""
+class PropertyRef(BaseModel):
+    property: str
 
+
+class Geometry(BaseModel):
+    type: str
+    coordinates: Any
+
+
+class GeometryLiteral(BaseModel):
+    geometry: Geometry
+
+
+class PeriodLiteral(BaseModel):
+    period: List[str]
+
+
+FilterArg = Union[
+    "FilterExpr", PropertyRef, GeometryLiteral, PeriodLiteral, int, float, str
+]
+
+
+class FilterExpr(BaseModel):
     op: str
-    args: List[Any]
+    args: List[FilterArg]
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+FilterExpr.update_forward_refs()
 
 
 cql2_filter_agent = Agent(
-    "openai:gpt-4o-mini",
-    result_type=Cql2Filter,
+    SMALL_MODEL_NAME,
+    result_type=FilterExpr,
     system_prompt="""
 For the given query, construct a CQL2 filter to be used to query the STAC API only if required.
 Return None if the query doesn't require a CQL2 filter or if you can't determine the filter or if the property is not supported.
@@ -200,7 +230,7 @@ Return None if the query doesn't require a CQL2 filter or if you can't determine
 
 
 @search_items_agent.tool
-async def construct_cql2_filter(ctx: RunContext[Context]) -> Cql2Filter:
+async def construct_cql2_filter(ctx: RunContext[Context]) -> FilterExpr | None:
     return await cql2_filter_agent.run(ctx.deps.query)
 
 
@@ -259,8 +289,7 @@ async def item_search(ctx: Context) -> ItemSearchResult:
         collections_to_search = default_target_collections
 
     # Actually perform the search
-    CATALOG_URL = "https://planetarycomputer.microsoft.com/api/stac/v1"
-    client = Client.open(CATALOG_URL)
+    client = Client.open(STAC_CATALOG_URL)
     params = {
         "max_items": 20,
         # looks like collections is required by Planetary Computer STAC API
