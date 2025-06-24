@@ -89,7 +89,6 @@ async def collection_search(
     logger.info(f"Model loading time: {load_model_time - start_time:.4f} seconds")
 
     client = chromadb.PersistentClient(path=data_path)
-    logger.info(client.list_collections())
     collection_name = f"{stac_catalog_name}_collections"
     collection = client.get_collection(name=collection_name)
 

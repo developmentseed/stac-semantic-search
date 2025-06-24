@@ -249,11 +249,7 @@ def get_polygon_from_geodini(location: str):
     )
     result = response.json().get("result", None)
     if result:
-        polygon = result.get("geometry")
-        logger.info(
-            f"Found polygon for {location}: {pformat(mapping(shape(polygon).simplify(tolerance=0.1)))}"
-        )
-        return polygon
+        return result.get("geometry", None)
     return None
 
 
@@ -270,7 +266,6 @@ async def item_search(ctx: Context) -> ItemSearchResult:
     results = await search_items_agent.run(
         f"Find items for the query: {ctx.query}", deps=ctx
     )
-    logger.info(results.data)
 
     # determine the collections to search
     target_collections = await search_collections(ctx.query) or []
