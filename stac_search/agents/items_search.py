@@ -278,8 +278,6 @@ async def item_search(ctx: Context) -> ItemSearchResult:
     default_target_collections = [
         "landsat-8-c2-l2",
         "sentinel-2-l2a",
-        "landsat-8-c2-l2",
-        "landsat-8-c2-l2",
     ]
     if target_collections:
         explanation = "Considering the following collections:"
