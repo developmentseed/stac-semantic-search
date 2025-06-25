@@ -1,4 +1,5 @@
 from datetime import date
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -21,6 +22,10 @@ SMALL_MODEL_NAME = os.getenv("SMALL_MODEL_NAME", "openai:gpt-4.1-mini")
 STAC_CATALOG_URL = os.getenv(
     "STAC_CATALOG_URL", "https://planetarycomputer.microsoft.com/api/stac/v1"
 )
+DEFAULT_TARGET_COLLECTIONS = json.loads(
+    os.getenv("DEFAULT_TARGET_COLLECTIONS", '["landsat-8-c2-l2", "sentinel-2-l2a"]')
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -277,10 +282,7 @@ async def item_search(ctx: Context) -> ItemSearchResult:
     # determine the collections to search
     target_collections = await search_collections(ctx.query) or []
     logger.info(f"Target collections: {pformat(target_collections)}")
-    default_target_collections = [
-        "landsat-8-c2-l2",
-        "sentinel-2-l2a",
-    ]
+    default_target_collections = DEFAULT_TARGET_COLLECTIONS
     if target_collections:
         explanation = "Considering the following collections:"
         for result in target_collections.collections:

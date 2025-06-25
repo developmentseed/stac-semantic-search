@@ -43,6 +43,7 @@ api:
     GEODINI_API: "https://geodini.k8s.labs.ds.io"
     STAC_CATALOG_NAME: "planetarycomputer"
     STAC_CATALOG_URL: "https://planetarycomputer.microsoft.com/api/stac/v1"
+    DEFAULT_TARGET_COLLECTIONS: "['landsat-8-c2-l2', 'sentinel-2-l2a']"
   
   # Sensitive environment variables stored as Kubernetes secrets
   secrets:
