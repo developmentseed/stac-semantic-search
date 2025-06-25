@@ -2,79 +2,35 @@
 Load CLI for STAC Natural Query - creates and populates the vector database
 """
 
+import asyncio
 import logging
 import os
 
-import chromadb
-from pystac_client import Client
-from sentence_transformers import SentenceTransformer
+from .catalog_manager import CatalogManager
 
 logger = logging.getLogger(__name__)
 
-# Constants
-MODEL_NAME = "all-MiniLM-L6-v2"
-DATA_PATH = os.environ.get("DATA_PATH", "data/chromadb")
 
+def load_data(catalog_url: str):
+    """Load STAC collections into the vector database using CatalogManager"""
+    try:
+        # Initialize catalog manager
+        catalog_manager = CatalogManager()
 
-def load_data(catalog_url, catalog_name):
-    """Load STAC collections into the vector database"""
-    logger.info("Initializing vector database...")
+        # Load catalog using async method
+        result = asyncio.run(catalog_manager.load_catalog(catalog_url))
 
-    # Initialize the model
-    model = SentenceTransformer(MODEL_NAME)
+        if result["success"]:
+            logger.info(f"Successfully loaded catalog: {result['message']}")
+            if "collections_count" in result:
+                logger.info(f"Indexed {result['collections_count']} collections")
+        else:
+            logger.error(f"Failed to load catalog: {result['error']}")
+            raise Exception(result["error"])
 
-    # Initialize ChromaDB client with persistence settings
-    client = chromadb.PersistentClient(path=DATA_PATH)
-    chroma_collection = client.create_collection(
-        name=f"{catalog_name}_collections", get_or_create=True
-    )
-
-    # Initialize STAC client
-    stac_client = Client.open(catalog_url)
-
-    logger.info("Fetching STAC collections...")
-    collections = fetch_collections(stac_client)
-    logger.info(f"Found {len(collections)} collections")
-
-    logger.info("Generating embeddings and storing in vector database...")
-    store_in_vector_db(collections, model, chroma_collection)
-
-    logger.info("Data loading complete!")
-
-
-def fetch_collections(stac_client):
-    """Fetch STAC collections using pystac-client"""
-    collections = stac_client.collection_search().collections()
-    return list(collections)
-
-
-def generate_embeddings(collections, model):
-    """Generate embeddings for each collection (title + description)"""
-    texts = [
-        f"{collection.title} {collection.description}" for collection in collections
-    ]
-    embeddings = model.encode(texts)
-    return embeddings
-
-
-def store_in_vector_db(collections, model, chroma_collection):
-    """Store embeddings in ChromaDB"""
-    metadatas = [
-        {
-            "title": collection.title or "",
-            "description": collection.description or "",
-            "collection_id": collection.id,
-        }
-        for collection in collections
-    ]
-
-    embeddings = generate_embeddings(collections, model)
-
-    chroma_collection.add(
-        ids=[str(i) for i in range(len(collections))],
-        embeddings=embeddings,
-        metadatas=metadatas,
-    )
+    except Exception as e:
+        logger.error(f"Error loading data: {e}")
+        raise
 
 
 if __name__ == "__main__":
@@ -83,10 +39,7 @@ if __name__ == "__main__":
     #     catalog_url="https://planetarycomputer.microsoft.com/api/stac/v1",
     #     catalog_name="planetarycomputer",
     # )
-    import os
-
     STAC_CATALOG_URL = os.environ.get(
         "STAC_CATALOG_URL", "https://planetarycomputer.microsoft.com/api/stac/v1"
     )
-    STAC_CATALOG_NAME = os.environ.get("STAC_CATALOG_NAME", "planetarycomputer")
-    load_data(catalog_url=STAC_CATALOG_URL, catalog_name=STAC_CATALOG_NAME)
+    load_data(catalog_url=STAC_CATALOG_URL)

@@ -34,22 +34,57 @@ st.markdown(
     """
 )
 
-# Create input field for the query
-query = st.text_input(
-    "Enter your query",
-    placeholder="Find imagery over Paris from 2017",
-    help="Describe what kind of satellite imagery you're looking for",
-)
+# Create two columns for query and catalog URL
+col1, col2 = st.columns([3, 1])
 
-# Add a search button
-search_button = st.button("Search")
+with col1:
+    # Create input field for the query
+    query = st.text_input(
+        "Enter your query",
+        placeholder="Find imagery over Paris from 2017",
+        help="Describe what kind of satellite imagery you're looking for",
+    )
+    # Add a search button
+    search_button = st.button("Search")
+
+with col2:
+    # Define catalog options
+    catalog_options = {
+        "Planetary Computer": "https://planetarycomputer.microsoft.com/api/stac/v1",
+        "VEDA": "https://openveda.cloud/api/stac",
+        "E84 Earth Search": "https://earth-search.aws.element84.com/v1",
+        "DevSeed EOAPI.dev": "https://stac.eoapi.dev",
+        "Custom URL": "custom",
+    }
+
+    # Create dropdown for catalog selection
+    selected_catalog = st.selectbox(
+        "Select STAC Catalog",
+        options=list(catalog_options.keys()),
+        index=0,  # Default to Planetary Computer
+        help="Choose a predefined STAC catalog or select 'Custom URL' to enter your own.",
+    )
+
+    # Handle custom URL input
+    if selected_catalog == "Custom URL":
+        catalog_url = st.text_input(
+            "Enter Custom Catalog URL",
+            placeholder="https://your-catalog.com/stac/v1",
+            help="Enter the URL of your custom STAC catalog.",
+        )
+    else:
+        catalog_url = catalog_options[selected_catalog]
+        # Show the selected URL as read-only info
+        st.info(f"Using: {catalog_url}")
 
 
 # Function to run the search asynchronously
-async def run_search(query):
-    response = requests.post(
-        f"{API_URL}/items/search", json={"query": query, "limit": 10}
-    )
+async def run_search(query, catalog_url=None):
+    payload = {"query": query, "limit": 10}
+    if catalog_url:
+        payload["catalog_url"] = catalog_url.strip()
+
+    response = requests.post(f"{API_URL}/items/search", json=payload)
     return response.json()["results"]
 
 
@@ -60,7 +95,7 @@ if query and search_button:
             # Run the async search
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            results = loop.run_until_complete(run_search(query))
+            results = loop.run_until_complete(run_search(query, catalog_url))
             items = results["items"]
             aoi = results["aoi"]
             explanation = results["explanation"]
@@ -212,10 +247,19 @@ with st.sidebar:
         """
         Search for satellite imagery using natural language.
         
-        **Examples queries:**
+        **Available STAC Catalogs:**
+        - **Planetary Computer**: Microsoft's global dataset catalog
+        - **VEDA**: NASA's Earth science data catalog  
+        - **E84 Earth Search**: Element 84's STAC catalog for Earth observation data on AWS Open Data
+        - **DevSeed EOAPI.dev**: DevSeed's example STAC catalog
+        - **Custom URL**: Enter any STAC-compliant catalog URL
+        
+        The system will automatically index new catalogs on first use.
+        
+        **Example queries:**
         - imagery of Paris from 2017
         - Cloud-free satellite data of Georgia the country from 2022
-        - relatively cloud-free images in 2024 that have RGB visual bands over Longmont, Colorado that can be downloaded via HTTP
+        - relatively cloud-free images in 2024 over Longmont, Colorado
         - images in 2024 over Odisha with cloud cover between 50 to 60%
         - NAIP imagery over the state of Washington
         - Burn scar imagery of from 2024 over the state of California

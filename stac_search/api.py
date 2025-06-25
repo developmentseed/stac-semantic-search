@@ -2,9 +2,10 @@
 FastAPI server for STAC Natural Query
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 import uvicorn
 
 from stac_search.agents.collections_search import collection_search
@@ -30,10 +31,12 @@ app.add_middleware(
 # Define request model
 class QueryRequest(BaseModel):
     query: str
+    catalog_url: Optional[str] = None
 
 
 class STACItemsRequest(BaseModel):
     query: str
+    catalog_url: Optional[str] = None
     return_search_params_only: bool = False
 
 
@@ -41,18 +44,28 @@ class STACItemsRequest(BaseModel):
 @app.post("/search")
 async def search(request: QueryRequest):
     """Search for STAC collections using natural language"""
-    results = collection_search(request.query)
-    return {"results": results}
+    try:
+        results = await collection_search(
+            request.query, catalog_url=request.catalog_url
+        )
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/items/search")
 async def search_items(request: STACItemsRequest):
     """Search for STAC items using natural language"""
-    ctx = ItemSearchContext(
-        query=request.query, return_search_params_only=request.return_search_params_only
-    )
-    results = await item_search(ctx)
-    return {"results": results}
+    try:
+        ctx = ItemSearchContext(
+            query=request.query,
+            catalog_url=request.catalog_url,
+            return_search_params_only=request.return_search_params_only,
+        )
+        results = await item_search(ctx)
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def start_server(host: str = "0.0.0.0", port: int = 8000):
