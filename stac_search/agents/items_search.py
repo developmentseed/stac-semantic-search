@@ -1,4 +1,4 @@
-import datetime
+from datetime import date
 import logging
 import os
 from dataclasses import dataclass
@@ -9,7 +9,6 @@ import requests
 from pydantic_ai import Agent, RunContext
 from pystac_client import Client
 from pydantic import BaseModel, ConfigDict
-from shapely.geometry import shape, mapping
 
 from stac_search.agents.collections_search import (
     collection_search,
@@ -47,16 +46,20 @@ search_items_agent = Agent(
     SMALL_MODEL_NAME,
     result_type=ItemSearchParams,
     deps_type=Context,
-    system_prompt=f"""
+    system_prompt="""
 For the given query, extract the start date, end date, and location.
 
 If the query contains a spatial extent, use the `set_spatial_extent` tool to get the location.
 If the query contains a temporal range, use the `set_temporal_range` tool to get the datetime.
 If the query needs cloud cover filtering, use the `construct_cql2_filter` tool to create a CQL2 filter.
 
-For context, the current date is {datetime.datetime.now().strftime("%Y-%m-%d")}.
 """,
 )
+
+
+@search_items_agent.system_prompt
+def search_items_agent_system_prompt():
+    return f"The current date is {date.today()}"
 
 
 @dataclass
@@ -146,9 +149,13 @@ temporal_range_agent = Agent(
 For the given query, if it contains a temporal range, return the start date and end date. If it doesn't contain a temporal range, return None.
 The temporal range should be of the form YYYY-MM-DD/YYYY-MM-DD.
 For open-ended ranges, use "..", for example "2023-01-01/.." or "../2023-12-31".
-The current date is {datetime.datetime.now().strftime("%Y-%m-%d")}.
 """,
 )
+
+
+@temporal_range_agent.system_prompt
+def temporal_range_agent_system_prompt():
+    return f"The current date is {date.today()}"
 
 
 @search_items_agent.tool
@@ -289,11 +296,7 @@ async def item_search(ctx: Context) -> ItemSearchResult:
     client = Client.open(STAC_CATALOG_URL)
     params = {
         "max_items": 20,
-        # looks like collections is required by Planetary Computer STAC API
-        # but can be omitted for elasticsearch based STAC APIs like the element84 one
         "collections": collections_to_search,
-        # "collections": ["*"],
-        # "datetime": "2018",
         "datetime": results.data.datetime,
         "filter": results.data.filter,
     }
