@@ -2,14 +2,18 @@
 FastAPI server for STAC Natural Query
 """
 
+import logging
+from typing import Optional
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
 import uvicorn
 
 from stac_search.agents.collections_search import collection_search
 from stac_search.agents.items_search import item_search, Context as ItemSearchContext
+
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -65,6 +69,7 @@ async def search_items(request: STACItemsRequest):
         results = await item_search(ctx)
         return {"results": results}
     except Exception as e:
+        logger.exception(e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

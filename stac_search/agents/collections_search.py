@@ -12,6 +12,7 @@ from typing import List, Dict, Any
 
 from pydantic_ai import Agent
 from stac_search.catalog_manager import CatalogManager
+from stac_search.cache import async_cached, embedding_cache, agent_cache
 
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,19 @@ For each collection, provide:
 )
 
 
+@async_cached(embedding_cache)
+async def _generate_query_embedding(catalog_manager, query: str):
+    """Generate cached embedding for query string"""
+    return await asyncio.to_thread(catalog_manager.model.encode, [query])
+
+
+@async_cached(agent_cache)
+async def _run_rerank_agent(user_prompt: str) -> RankedCollections:
+    """Run the rerank agent with caching"""
+    result = await rerank_agent.run(user_prompt)
+    return result.data
+
+
 async def collection_search(
     query: str,
     top_k: int = 5,
@@ -98,7 +112,7 @@ async def collection_search(
     logger.info(f"Model loading time: {load_model_time - start_time:.4f} seconds")
 
     # Generate query embedding
-    query_embedding = await asyncio.to_thread(catalog_manager.model.encode, [query])
+    query_embedding = await _generate_query_embedding(catalog_manager, query)
 
     # Search vector database
     results = await asyncio.to_thread(
@@ -122,9 +136,9 @@ Collections to evaluate:
 {collections_text}
 """
 
-    agent_result = await rerank_agent.run(user_prompt)
+    agent_result = await _run_rerank_agent(user_prompt)
 
-    return agent_result.data.results
+    return agent_result.results
 
 
 async def main():
