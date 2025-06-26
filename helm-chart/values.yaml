@@ -10,6 +10,8 @@ api:
     pullPolicy: IfNotPresent
     tag: "latest"
   
+  command: ["uvicorn", "stac_search.api:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+  
   replicaCount: 1
   
   # Init container configuration for loading STAC data
@@ -59,8 +61,8 @@ api:
       path: /docs
       port: 8000
     initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 5
+    periodSeconds: 30
+    timeoutSeconds: 30
     failureThreshold: 3
   
   readinessProbe:
@@ -68,8 +70,8 @@ api:
       path: /docs
       port: 8000
     initialDelaySeconds: 5
-    periodSeconds: 5
-    timeoutSeconds: 3
+    periodSeconds: 30
+    timeoutSeconds: 30
     failureThreshold: 3
 
 # Frontend service configuration

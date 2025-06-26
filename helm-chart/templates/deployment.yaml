@@ -67,6 +67,7 @@ spec:
             - name: http
               containerPort: {{ .Values.api.service.targetPort }}
               protocol: TCP
+          command: {{ toYaml .Values.api.command | nindent 12 }}
           env:
             {{- range $key, $value := .Values.api.env }}
             - name: {{ $key }}
