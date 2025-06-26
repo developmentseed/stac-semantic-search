@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Context:
     query: str
+    catalog_url: str | None = None
     location: str | None = None
     top_k: int = 5
     return_search_params_only: bool = False
@@ -105,12 +106,16 @@ class CollectionSearchResult:
     collections: List[CollectionWithExplanation]
 
 
-async def search_collections(query: str) -> CollectionSearchResult | None:
+async def search_collections(
+    query: str, catalog_url: str = None
+) -> CollectionSearchResult | None:
     logger.info("Searching for relevant collections ...")
     collection_query = await collection_query_framing_agent.run(query)
     logger.info(f"Framed collection query: {collection_query.data.query}")
     if collection_query.data.is_specific:
-        collections = await collection_search(collection_query.data.query)
+        collections = await collection_search(
+            collection_query.data.query, catalog_url=catalog_url
+        )
         return CollectionSearchResult(collections=collections)
     else:
         return None
@@ -278,11 +283,26 @@ async def item_search(ctx: Context) -> ItemSearchResult:
     results = await search_items_agent.run(
         f"Find items for the query: {ctx.query}", deps=ctx
     )
+    catalog_url_to_use = ctx.catalog_url or STAC_CATALOG_URL
 
     # determine the collections to search
-    target_collections = await search_collections(ctx.query) or []
+    target_collections = await search_collections(ctx.query, catalog_url_to_use) or []
     logger.info(f"Target collections: {pformat(target_collections)}")
-    default_target_collections = DEFAULT_TARGET_COLLECTIONS
+
+    if not target_collections:
+        # If no specific collections were found, use the default target collections
+        default_target_collections = DEFAULT_TARGET_COLLECTIONS
+        # check that default_target_collections exist in the catalog
+        all_collection_ids = [
+            collection.id
+            for collection in Client.open(catalog_url_to_use).get_collections()
+        ]
+        default_target_collections = [
+            collection_id
+            for collection_id in default_target_collections
+            if collection_id in all_collection_ids
+        ]
+
     if target_collections:
         explanation = "Considering the following collections:"
         for result in target_collections.collections:
@@ -290,12 +310,15 @@ async def item_search(ctx: Context) -> ItemSearchResult:
         collections_to_search = [
             collection.collection_id for collection in target_collections.collections
         ]
-    else:
+    elif default_target_collections:
         explanation = f"Including the following common collections in the search: {', '.join(default_target_collections)}\n"
         collections_to_search = default_target_collections
+    else:
+        explanation = "Searching all collections in the catalog."
+        collections_to_search = all_collection_ids
 
     # Actually perform the search
-    client = Client.open(STAC_CATALOG_URL)
+    client = Client.open(catalog_url_to_use)
     params = {
         "max_items": 20,
         "collections": collections_to_search,
@@ -310,11 +333,9 @@ async def item_search(ctx: Context) -> ItemSearchResult:
         logger.info(f"Found polygon for {results.data.location}")
         params["intersects"] = polygon
     else:
+        explanation += f"\n\n No polygon found for {results.data.location}. "
         return ItemSearchResult(
-            items=None,
-            search_params=params,
-            aoi=None,
-            explanation=f"No polygon found for {results.data.location}",
+            items=None, search_params=params, aoi=None, explanation=explanation
         )
 
     if ctx.return_search_params_only:

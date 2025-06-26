@@ -137,7 +137,6 @@ The init container uses the same STAC catalog configuration as the API:
 api:
   env:
     STAC_CATALOG_URL: "https://planetarycomputer.microsoft.com/api/stac/v1"
-    STAC_CATALOG_NAME: "planetarycomputer"
   
   initContainer:
     enabled: true  # Set to false to disable data pre-loading

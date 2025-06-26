@@ -9,9 +9,8 @@ from dataclasses import dataclass
 from pprint import pformat
 from typing import List, Dict, Any
 
-import chromadb
 from pydantic_ai import Agent
-from sentence_transformers import SentenceTransformer
+from stac_search.catalog_manager import CatalogManager
 
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,6 @@ logger = logging.getLogger(__name__)
 MODEL_NAME = "all-MiniLM-L6-v2"
 DATA_PATH = os.environ.get("DATA_PATH", "data/chromadb")
 
-STAC_CATALOG_NAME = os.getenv("STAC_CATALOG_NAME", "planetarycomputer")
 STAC_COLLECTIONS_URL = os.getenv(
     "STAC_COLLECTIONS_URL", "https://planetarycomputer.microsoft.com/api/stac/v1"
 )
@@ -65,7 +63,7 @@ async def collection_search(
     top_k: int = 5,
     model_name: str = MODEL_NAME,
     data_path: str = DATA_PATH,
-    stac_catalog_name: str = STAC_CATALOG_NAME,
+    catalog_url: str = None,
 ) -> List[CollectionWithExplanation]:
     """
     Search for collections and rerank results with explanations
@@ -75,25 +73,31 @@ async def collection_search(
         top_k: Maximum number of results to return
         model_name: Name of the sentence transformer model to use
         data_path: Path to the vector database
-        stac_catalog_name: Name of the STAC catalog
-        stac_collections_url: URL of the STAC collections API
+        catalog_url: URL of the STAC catalog
 
     Returns:
         Ranked results with relevance explanations
     """
     start_time = time.time()
 
-    # Initialize model and database connections
-    model = SentenceTransformer(model_name)
+    # Initialize catalog manager
+    catalog_manager = CatalogManager(data_path=data_path, model_name=model_name)
+
+    # If catalog_url is provided, ensure it's loaded
+    if catalog_url:
+        load_result = await catalog_manager.load_catalog(catalog_url)
+        if not load_result["success"]:
+            logger.error(f"Failed to load catalog: {load_result['error']}")
+            raise ValueError(f"Failed to load catalog: {load_result['error']}")
+
+    # Get the appropriate collection
+    collection = catalog_manager.get_catalog_collection(catalog_url)
+
     load_model_time = time.time()
     logger.info(f"Model loading time: {load_model_time - start_time:.4f} seconds")
 
-    client = chromadb.PersistentClient(path=data_path)
-    collection_name = f"{stac_catalog_name}_collections"
-    collection = client.get_collection(name=collection_name)
-
     # Generate query embedding
-    query_embedding = model.encode([query])
+    query_embedding = catalog_manager.model.encode([query])
 
     # Search vector database
     results = collection.query(
