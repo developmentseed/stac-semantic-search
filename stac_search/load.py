@@ -6,7 +6,7 @@ import asyncio
 import logging
 import os
 
-from .catalog_manager import CatalogManager
+from stac_search.catalog_manager import CatalogManager
 
 logger = logging.getLogger(__name__)
 
