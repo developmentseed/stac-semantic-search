@@ -2,6 +2,7 @@
 Catalog Manager for STAC Natural Query - handles dynamic catalog loading and management
 """
 
+import asyncio
 import hashlib
 import logging
 import os
@@ -52,27 +53,35 @@ class CatalogManager:
             logger.error(f"Error checking catalog existence: {e}")
             return False
 
-    def validate_catalog_url(self, catalog_url: str) -> bool:
+    async def validate_catalog_url(self, catalog_url: str) -> bool:
         """Validate that the catalog URL is accessible and is a valid STAC catalog"""
         try:
-            stac_client = Client.open(catalog_url)
-            # Try to get at least one collection to verify it's a valid catalog
-            collections = list(stac_client.collection_search().collections())
-            return len(collections) > 0
+
+            def _validate():
+                stac_client = Client.open(catalog_url)
+                # Try to get at least one collection to verify it's a valid catalog
+                collections = list(stac_client.collection_search().collections())
+                return len(collections) > 0
+
+            return await asyncio.to_thread(_validate)
         except Exception as e:
             logger.error(f"Invalid catalog URL {catalog_url}: {e}")
             return False
 
-    def fetch_collections(self, stac_client: Client) -> list:
+    async def fetch_collections(self, stac_client: Client) -> list:
         """Fetch STAC collections using pystac-client"""
         try:
-            collections = stac_client.collection_search().collections()
-            return list(collections)
+
+            def _fetch():
+                collections = stac_client.collection_search().collections()
+                return list(collections)
+
+            return await asyncio.to_thread(_fetch)
         except Exception as e:
             logger.error(f"Error fetching collections: {e}")
             return []
 
-    def generate_embeddings(self, collections: list) -> list:
+    async def generate_embeddings(self, collections: list) -> list:
         """Generate embeddings for each collection (title + description)"""
         texts = []
         for collection in collections:
@@ -80,10 +89,10 @@ class CatalogManager:
             description = getattr(collection, "description", "") or ""
             texts.append(f"{title} {description}")
 
-        embeddings = self.model.encode(texts)
+        embeddings = await asyncio.to_thread(self.model.encode, texts)
         return embeddings
 
-    def store_in_vector_db(self, collections: list, chroma_collection) -> None:
+    async def store_in_vector_db(self, collections: list, chroma_collection) -> None:
         """Store embeddings in ChromaDB"""
         if not collections:
             logger.warning("No collections to store")
@@ -98,9 +107,10 @@ class CatalogManager:
             }
             metadatas.append(metadata)
 
-        embeddings = self.generate_embeddings(collections)
+        embeddings = await self.generate_embeddings(collections)
 
-        chroma_collection.add(
+        await asyncio.to_thread(
+            chroma_collection.add,
             ids=[str(i) for i in range(len(collections))],
             embeddings=embeddings,
             metadatas=metadatas,
@@ -110,7 +120,7 @@ class CatalogManager:
         """Load and index a catalog if it doesn't exist"""
         try:
             # Validate catalog URL first
-            if not self.validate_catalog_url(catalog_url):
+            if not await self.validate_catalog_url(catalog_url):
                 return {
                     "success": False,
                     "error": f"Invalid or inaccessible catalog URL: {catalog_url}",
@@ -127,8 +137,8 @@ class CatalogManager:
 
             # Load the catalog
             logger.info(f"Loading catalog from {catalog_url}")
-            stac_client = Client.open(catalog_url)
-            collections = self.fetch_collections(stac_client)
+            stac_client = await asyncio.to_thread(Client.open, catalog_url)
+            collections = await self.fetch_collections(stac_client)
 
             if not collections:
                 return {
@@ -143,7 +153,7 @@ class CatalogManager:
             )
 
             # Store in vector database
-            self.store_in_vector_db(collections, chroma_collection)
+            await self.store_in_vector_db(collections, chroma_collection)
 
             logger.info(
                 f"Successfully indexed {len(collections)} collections from {catalog_url}"

@@ -2,6 +2,7 @@
 Search module for STAC Natural Query
 """
 
+import asyncio
 import logging
 import os
 import time
@@ -97,10 +98,11 @@ async def collection_search(
     logger.info(f"Model loading time: {load_model_time - start_time:.4f} seconds")
 
     # Generate query embedding
-    query_embedding = catalog_manager.model.encode([query])
+    query_embedding = await asyncio.to_thread(catalog_manager.model.encode, [query])
 
     # Search vector database
-    results = collection.query(
+    results = await asyncio.to_thread(
+        collection.query,
         query_embeddings=query_embedding.tolist(),
         n_results=top_k * 2,  # Get more results initially for better reranking
     )
@@ -131,6 +133,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    import asyncio
-
     asyncio.run(main())

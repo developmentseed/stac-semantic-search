@@ -5,9 +5,10 @@ import os
 from dataclasses import dataclass
 from pprint import pformat
 import time
+import asyncio
 from typing import List, Dict, Any, Union
 
-import requests
+import aiohttp
 from pydantic_ai import Agent, RunContext
 from pystac_client import Client
 from pydantic import BaseModel, ConfigDict
@@ -259,15 +260,13 @@ async def construct_cql2_filter(ctx: RunContext[Context]) -> FilterExpr | None:
     return await cql2_filter_agent.run(ctx.deps.query)
 
 
-def get_polygon_from_geodini(location: str):
+async def get_polygon_from_geodini(location: str):
     geodini_api = f"{GEODINI_API}/search_complex"
-    response = requests.get(
-        geodini_api,
-        params={"query": location},
-    )
-    result = response.json().get("result", None)
-    if result:
-        return result.get("geometry", None)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(geodini_api, params={"query": location}) as response:
+            result = (await response.json()).get("result", None)
+            if result:
+                return result.get("geometry", None)
     return None
 
 
@@ -300,10 +299,12 @@ async def item_search(ctx: Context) -> ItemSearchResult:
         # If no specific collections were found, use the default target collections
         default_target_collections = DEFAULT_TARGET_COLLECTIONS
         # check that default_target_collections exist in the catalog
-        all_collection_ids = [
-            collection.id
-            for collection in Client.open(catalog_url_to_use).get_collections()
-        ]
+        all_collection_ids = await asyncio.to_thread(
+            lambda: [
+                collection.id
+                for collection in Client.open(catalog_url_to_use).get_collections()
+            ]
+        )
         default_target_collections = [
             collection_id
             for collection_id in default_target_collections
@@ -339,7 +340,7 @@ async def item_search(ctx: Context) -> ItemSearchResult:
         f"Params formulation time: {params_formulation_time - query_formulation_time} seconds"
     )
 
-    polygon = get_polygon_from_geodini(results.data.location)
+    polygon = await get_polygon_from_geodini(results.data.location)
     if polygon:
         logger.info(f"Found polygon for {results.data.location}")
         params["intersects"] = polygon
@@ -349,25 +350,21 @@ async def item_search(ctx: Context) -> ItemSearchResult:
             items=None, search_params=params, aoi=None, explanation=explanation
         )
     geocoding_time = time.time()
-    logger.info(
-        f"Geocoding time: {geocoding_time - params_formulation_time} seconds"
-    )
+    logger.info(f"Geocoding time: {geocoding_time - params_formulation_time} seconds")
 
     if ctx.return_search_params_only:
         logger.info("Returning STAC query parameters only")
         total_time = time.time() - start_time
-        logger.info(
-            f"Total time: {total_time} seconds"
-        )
+        logger.info(f"Total time: {total_time} seconds")
         return ItemSearchResult(
             search_params=params, aoi=polygon, explanation=explanation
         )
 
-    items = list(client.search(**params).items_as_dicts())
-    search_time = time.time()
-    logger.info(
-        f"Search time: {search_time - geocoding_time} seconds"
+    items = await asyncio.to_thread(
+        lambda: list(client.search(**params).items_as_dicts())
     )
+    search_time = time.time()
+    logger.info(f"Search time: {search_time - geocoding_time} seconds")
     total_time = time.time() - start_time
     logger.info(f"Total time: {total_time} seconds")
     return ItemSearchResult(
@@ -382,6 +379,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    import asyncio
-
     asyncio.run(main())
