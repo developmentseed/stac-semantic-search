@@ -4,6 +4,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pprint import pformat
+import time
 from typing import List, Dict, Any, Union
 
 import requests
@@ -279,10 +280,16 @@ class ItemSearchResult:
 
 
 async def item_search(ctx: Context) -> ItemSearchResult:
+    start_time = time.time()
     # formulate the query to be used for the search
     results = await search_items_agent.run(
         f"Find items for the query: {ctx.query}", deps=ctx
     )
+    query_formulation_time = time.time()
+    logger.info(
+        f"Query formulation time: {query_formulation_time - start_time} seconds"
+    )
+
     catalog_url_to_use = ctx.catalog_url or STAC_CATALOG_URL
 
     # determine the collections to search
@@ -327,6 +334,10 @@ async def item_search(ctx: Context) -> ItemSearchResult:
     }
 
     logger.info(f"Searching with params: {params}")
+    params_formulation_time = time.time()
+    logger.info(
+        f"Params formulation time: {params_formulation_time - query_formulation_time} seconds"
+    )
 
     polygon = get_polygon_from_geodini(results.data.location)
     if polygon:
@@ -337,14 +348,28 @@ async def item_search(ctx: Context) -> ItemSearchResult:
         return ItemSearchResult(
             items=None, search_params=params, aoi=None, explanation=explanation
         )
+    geocoding_time = time.time()
+    logger.info(
+        f"Geocoding time: {geocoding_time - params_formulation_time} seconds"
+    )
 
     if ctx.return_search_params_only:
         logger.info("Returning STAC query parameters only")
+        total_time = time.time() - start_time
+        logger.info(
+            f"Total time: {total_time} seconds"
+        )
         return ItemSearchResult(
             search_params=params, aoi=polygon, explanation=explanation
         )
 
     items = list(client.search(**params).items_as_dicts())
+    search_time = time.time()
+    logger.info(
+        f"Search time: {search_time - geocoding_time} seconds"
+    )
+    total_time = time.time() - start_time
+    logger.info(f"Total time: {total_time} seconds")
     return ItemSearchResult(
         items=items, aoi=polygon, explanation=explanation, search_params=params
     )
