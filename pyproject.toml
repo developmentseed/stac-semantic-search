@@ -19,6 +19,7 @@ dependencies = [
     "pydantic-ai",
     "shapely",
     "aiohttp",
+    "cachetools>=5.0.0",
 ]
 
 [tool.setuptools]

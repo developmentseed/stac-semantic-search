@@ -11,11 +11,15 @@ import chromadb
 from pystac_client import Client
 from sentence_transformers import SentenceTransformer
 
+from stac_search.cache import async_cached, embedding_cache
+
+
 logger = logging.getLogger(__name__)
 
 # Constants
 MODEL_NAME = "all-MiniLM-L6-v2"
 DATA_PATH = os.environ.get("DATA_PATH", "data/chromadb")
+MODEL = SentenceTransformer(MODEL_NAME)
 
 
 class CatalogManager:
@@ -24,11 +28,15 @@ class CatalogManager:
     def __init__(self, data_path: str = DATA_PATH, model_name: str = MODEL_NAME):
         self.data_path = data_path
         self.model_name = model_name
-        self.model = SentenceTransformer(model_name)
         self.client = chromadb.PersistentClient(path=data_path)
+
+    @property
+    def model(self):
+        return MODEL
 
     def _get_catalog_name(self, catalog_url: str) -> str:
         """Generate a unique catalog name from URL"""
+        logger.info(f"Generating catalog name for {catalog_url}")
         # Create a hash of the URL for consistent naming
         url_hash = hashlib.md5(catalog_url.encode()).hexdigest()[:8]
         # Clean URL for readability
@@ -81,6 +89,7 @@ class CatalogManager:
             logger.error(f"Error fetching collections: {e}")
             return []
 
+    @async_cached(embedding_cache)
     async def generate_embeddings(self, collections: list) -> list:
         """Generate embeddings for each collection (title + description)"""
         texts = []
