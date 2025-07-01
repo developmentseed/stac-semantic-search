@@ -2,12 +2,11 @@ from datetime import date
 import json
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pprint import pformat
 import time
 import asyncio
 from typing import List, Dict, Any, Union
-
 import aiohttp
 from pydantic_ai import Agent, RunContext
 from pystac_client import Client
@@ -17,6 +16,7 @@ from stac_search.agents.collections_search import (
     collection_search,
     CollectionWithExplanation,
 )
+from stac_search.cache import async_cached, agent_cache, geocoding_cache
 
 
 GEODINI_API = os.getenv("GEODINI_API", "https://geodini.k8s.labs.ds.io")
@@ -70,6 +70,12 @@ def search_items_agent_system_prompt():
     return f"The current date is {date.today()}"
 
 
+@async_cached(agent_cache)
+async def _run_search_items_agent(query: str, deps: dict) -> ItemSearchParams:
+    result = await search_items_agent.run(query, deps=Context(**deps))
+    return result.data
+
+
 @dataclass
 class CollectionQuery:
     query: str
@@ -108,15 +114,22 @@ class CollectionSearchResult:
     collections: List[CollectionWithExplanation]
 
 
+@async_cached(agent_cache)
+async def _run_collection_query_framing_agent(query: str) -> CollectionQuery:
+    result = await collection_query_framing_agent.run(query)
+    return result.data
+
+
+@async_cached(agent_cache)
 async def search_collections(
     query: str, catalog_url: str = None
 ) -> CollectionSearchResult | None:
     logger.info("Searching for relevant collections ...")
-    collection_query = await collection_query_framing_agent.run(query)
-    logger.info(f"Framed collection query: {collection_query.data.query}")
-    if collection_query.data.is_specific:
+    collection_query = await _run_collection_query_framing_agent(query)
+    logger.info(f"Framed collection query: {collection_query.query}")
+    if collection_query.is_specific:
         collections = await collection_search(
-            collection_query.data.query, catalog_url=catalog_url
+            collection_query.query, catalog_url=catalog_url
         )
         return CollectionSearchResult(collections=collections)
     else:
@@ -143,10 +156,15 @@ If the query is "do you have anything from Georgia the country", the location qu
 )
 
 
+@async_cached(geocoding_cache)
+async def _run_geocoding_agent(query: str) -> GeocodingResult:
+    result = await geocoding_agent.run(query)
+    return result.data
+
+
 @search_items_agent.tool
 async def set_spatial_extent(ctx: RunContext[Context]) -> GeocodingResult:
-    result = await geocoding_agent.run(ctx.deps.query)
-    return result.data
+    return await _run_geocoding_agent(ctx.deps.query)
 
 
 @dataclass
@@ -170,10 +188,15 @@ def temporal_range_agent_system_prompt():
     return f"The current date is {date.today()}"
 
 
+@async_cached(agent_cache)
+async def _run_temporal_range_agent(query: str) -> TemporalRangeResult:
+    result = await temporal_range_agent.run(query)
+    return result.data
+
+
 @search_items_agent.tool
 async def set_temporal_range(ctx: RunContext[Context]) -> TemporalRangeResult:
-    result = await temporal_range_agent.run(ctx.deps.query)
-    return result.data
+    return await _run_temporal_range_agent(ctx.deps.query)
 
 
 class PropertyRef(BaseModel):
@@ -255,11 +278,18 @@ Return the filter dictionary itself as a JSON object. No additional keys or valu
 )
 
 
+@async_cached(agent_cache)
+async def _run_cql2_filter_agent(query: str) -> FilterExpr | None:
+    result = await cql2_filter_agent.run(query)
+    return result.data
+
+
 @search_items_agent.tool
 async def construct_cql2_filter(ctx: RunContext[Context]) -> FilterExpr | None:
-    return await cql2_filter_agent.run(ctx.deps.query)
+    return await _run_cql2_filter_agent(ctx.deps.query)
 
 
+@async_cached(geocoding_cache)
 async def get_polygon_from_geodini(location: str):
     geodini_api = f"{GEODINI_API}/search_complex"
     async with aiohttp.ClientSession() as session:
@@ -281,8 +311,8 @@ class ItemSearchResult:
 async def item_search(ctx: Context) -> ItemSearchResult:
     start_time = time.time()
     # formulate the query to be used for the search
-    results = await search_items_agent.run(
-        f"Find items for the query: {ctx.query}", deps=ctx
+    results = await _run_search_items_agent(
+        query=f"Find items for the query: {ctx.query}", deps=asdict(ctx)
     )
     query_formulation_time = time.time()
     logger.info(
@@ -330,8 +360,8 @@ async def item_search(ctx: Context) -> ItemSearchResult:
     params = {
         "max_items": 20,
         "collections": collections_to_search,
-        "datetime": results.data.datetime,
-        "filter": results.data.filter,
+        "datetime": results.datetime,
+        "filter": results.filter,
     }
 
     logger.info(f"Searching with params: {params}")
@@ -340,12 +370,12 @@ async def item_search(ctx: Context) -> ItemSearchResult:
         f"Params formulation time: {params_formulation_time - query_formulation_time} seconds"
     )
 
-    polygon = await get_polygon_from_geodini(results.data.location)
+    polygon = await get_polygon_from_geodini(results.location)
     if polygon:
-        logger.info(f"Found polygon for {results.data.location}")
+        logger.info(f"Found polygon for {results.location}")
         params["intersects"] = polygon
     else:
-        explanation += f"\n\n No polygon found for {results.data.location}. "
+        explanation += f"\n\n No polygon found for {results.location}. "
         return ItemSearchResult(
             items=None, search_params=params, aoi=None, explanation=explanation
         )
