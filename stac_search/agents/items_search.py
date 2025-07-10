@@ -291,7 +291,7 @@ async def construct_cql2_filter(ctx: RunContext[Context]) -> FilterExpr | None:
 
 @async_cached(geocoding_cache)
 async def get_polygon_from_geodini(location: str):
-    geodini_api = f"{GEODINI_API}/search_complex"
+    geodini_api = f"{GEODINI_API}/search"
     async with aiohttp.ClientSession() as session:
         async with session.get(geodini_api, params={"query": location}) as response:
             result = (await response.json()).get("result", None)
