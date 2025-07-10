@@ -294,9 +294,9 @@ async def get_polygon_from_geodini(location: str):
     geodini_api = f"{GEODINI_API}/search"
     async with aiohttp.ClientSession() as session:
         async with session.get(geodini_api, params={"query": location}) as response:
-            result = (await response.json()).get("result", None)
+            result = (await response.json()).get("results", [])
             if result:
-                return result.get("geometry", None)
+                return result[0].get("geometry", None)
     return None
 
 
