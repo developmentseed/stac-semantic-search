@@ -370,15 +370,19 @@ async def item_search(ctx: Context) -> ItemSearchResult:
         f"Params formulation time: {params_formulation_time - query_formulation_time} seconds"
     )
 
-    polygon = await get_polygon_from_geodini(results.location)
-    if polygon:
-        logger.info(f"Found polygon for {results.location}")
-        params["intersects"] = polygon
+    if results.location:
+        polygon = await get_polygon_from_geodini(results.location)
+        if polygon:
+            logger.info(f"Found polygon for {results.location}")
+            params["intersects"] = polygon
+        else:
+            explanation += f"\n\n No polygon found for {results.location}. "
+            return ItemSearchResult(
+                items=None, search_params=params, aoi=None, explanation=explanation
+            )
     else:
-        explanation += f"\n\n No polygon found for {results.location}. "
-        return ItemSearchResult(
-            items=None, search_params=params, aoi=None, explanation=explanation
-        )
+        polygon = None
+        explanation += "\n\n No specific location provided in the query."
     geocoding_time = time.time()
     logger.info(f"Geocoding time: {geocoding_time - params_formulation_time} seconds")
 
